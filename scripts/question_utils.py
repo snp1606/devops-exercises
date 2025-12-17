@@ -5,89 +5,80 @@ Question utils functions
 import pathlib
 from random import choice
 from typing import List
+import re
 
-p = pathlib.Path(__file__).parent.parent.joinpath('README.md')
+README_PATH = pathlib.Path(__file__).parent.parent / "README.md"
+EXERCISES_PATH = pathlib.Path(__file__).parent.parent / "exercises"
 
-
-def get_file_list():
-    with open(p, 'rb') as f:
-        file_list = [line.rstrip() for line in f.readlines()]
-    return file_list
-
-
-def get_question_list(file_list: List[bytes]) -> list:
-
-    questions_list = []
-    temp = []
-    after_summary_tag = False
-
-    for line in file_list:
-        if line.startswith(b'<details>'):
-            temp.append(line)
-            after_summary_tag = True
-
-        elif after_summary_tag and line != b'' and b'</details>' not in line:
-            temp.append(line)
-
-        elif after_summary_tag and b'</details>' in line:
-            temp.append(line)
-            after_summary_tag = False
-
-            questions_list.append(temp)
-            temp = []
-
-    return questions_list
+DETAILS_PATTERN = re.compile(r"<details>(.*?)</details>", re.DOTALL)
+SUMMARY_PATTERN = re.compile(r"<summary>(.*?)</summary>", re.DOTALL)
+B_PATTERN = re.compile(r"<b>(.*?)</b>", re.DOTALL)
 
 
-def get_answered_questions(question_list: List[List[bytes]]) -> list:
-    """Dont let the type hint confuse you, problem of not using classes.
+def get_file_content() -> str:
+    with README_PATH.open("r", encoding="utf-8") as f:
+        return f.read()
 
-     It takes the result of get_question_list(file_list)
 
-     Returns a list of questions that are answered.
-     """
+def get_question_list(file_content: str) -> List[str]:
+    details = DETAILS_PATTERN.findall(file_content)
+    return [
+        SUMMARY_PATTERN.search(detail).group(1)
+        for detail in details
+        if SUMMARY_PATTERN.search(detail)
+    ]
 
-    t = []
 
-    for q in question_list:
+def get_answered_questions(file_content: str) -> List[str]:
+    details = DETAILS_PATTERN.findall(file_content)
+    answered = []
+    for detail in details:
+        summary_match = SUMMARY_PATTERN.search(detail)
+        b_match = B_PATTERN.search(detail)
+        if (
+                summary_match
+                and b_match
+                and summary_match.group(1).strip()
+                and b_match.group(1).strip()
+        ):
+            answered.append(summary_match.group(1))
+    return answered
 
-        index = 0
 
-        for i in q:
-            if b'</summary>' in i:
-                index = q.index(i)
-
-        if q[index+1: len(q) - 1]:
-            t.append(q)
-
-    return t
+def get_answers_count() -> List[int]:
+    file_content = get_file_content()
+    answered = get_answered_questions(file_content)
+    all_questions = get_question_list(file_content)
+    return [len(answered), len(all_questions)]
 
 
 def get_challenges_count() -> int:
-    challenges_path = pathlib.Path(__file__).parent.parent.joinpath('exercises').glob('*.md')
-    return len(list(challenges_path))
+    return len(list(EXERCISES_PATH.glob("*.md")))
 
 
-# WIP WAITING FEEDBACK
-def get_random_question(question_list: List[List[bytes]], with_answer=False):
+def get_random_question(question_list: List[str], with_answer: bool = False) -> str:
     if with_answer:
-        return choice(get_answered_questions(question_list))
-    return choice(question_list)
+        return choice(get_answered_questions(get_file_content()))
+    return choice(get_question_list(get_file_content()))
 
 
 """Use this question_list. Unless you have already opened/worked/need the file, then don't or
 you will end up doing the same thing twice.
-
 eg:
-
-#my_dir/main.py
-
+# my_dir/main.py
 from scripts import question_utils
 
-print(question_utils.get_answered_questions(question_utils.question_list)
-
+print(
+    question_utils.get_answered_questions(
+        question_utils.get_question_list(
+            question_utils.get_file_content()
+        )
+    )
+)
 >> 123
-
 """
 
-question_list = get_question_list(get_file_list())
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

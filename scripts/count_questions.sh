@@ -1,5 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# We dont care about non alphanumerics filenames so we just ls | grep to shorten the script.
+set -eu
 
-echo $(( $(grep \</summary\> -c README.md) + $(grep -i Solution README.md | grep \.md -c) ))
+count=$(echo $(( $(grep -E "\[Exercise\]|</summary>" -c README.md topics/*/README.md | awk -F: '{ s+=$2 } END { print s }' ))))
+
+echo "There are $count questions and exercises"
+
+sed -i "s/currently \*\*[0-9]*\*\*/currently \*\*$count\\**/" README.md
